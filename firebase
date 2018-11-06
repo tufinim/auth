@@ -1,0 +1,51 @@
+package identity
+
+import (
+	"context"
+	"net/http"
+
+	"firebase.google.com/go"
+	log "github.com/sirupsen/logrus"
+)
+
+func FirebaseAuth(w http.ResponseWriter, r *http.Request) bool {
+
+	conf := firebase.Config{ProjectID: ""} // getEnvVar("PROJECT_ID")}
+	log.Infof("conf: %v", conf)
+	app, err := firebase.NewApp(context.Background(), &conf /*, option.WithCredentialsFile(getEnvVar("GCLOUD_SERVICE_KEY"))*/)
+
+	log.Infof("app: %v", app)
+	if err != nil {
+		log.Fatalf("error creating app: %v\n", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return false
+	}
+
+	client, err := app.Auth(context.Background())
+	log.Infof("client: %v", client)
+	if err != nil {
+		log.Errorf("failed to get auth client with '%v'", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return false
+	}
+
+	idToken := r.URL.Query().Get("token")
+	if idToken == "" {
+		log.Infof("Id Token is an empty string")
+		w.WriteHeader(http.StatusUnauthorized)
+		return false
+	}
+	log.Infof("id token %s", idToken)
+
+	token, err := client.VerifyIDToken(context.Background(), idToken) // TODO: check if context.Background() is correct
+	if err != nil {
+		log.Fatalf("error verifying ID token: %v\n", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return false
+	}
+
+	w.WriteHeader(http.StatusOK)
+	log.Infof("Verified ID token: %v", token)
+
+	return true
+}
